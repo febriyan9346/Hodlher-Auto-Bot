@@ -53,8 +53,9 @@ pip install -r requirements.txt
 Create `accounts.txt` in the root directory with your private keys (one per line):
 
 ```
-0x1234567890abcdef...
-0xabcdef1234567890...
+0xYourPrivateKey1
+0xYourPrivateKey2
+0xYourPrivateKey3
 ```
 
 ⚠️ **Warning**: Keep your private keys secure! Never share them publicly.
@@ -65,13 +66,9 @@ Create `proxy.txt` in the root directory (one proxy per line):
 
 ```
 http://user:pass@host:port
-http://user:pass@host:port
+http://host:port
+socks5://user:pass@host:port
 ```
-
-Supported formats:
-- `http://host:port`
-- `http://user:pass@host:port`
-- `socks5://host:port`
 
 ## 🎮 Usage
 
