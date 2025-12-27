@@ -77,14 +77,18 @@ class HodlHerBot:
     
     def create_signature(self) -> Dict[str, str]:
         timestamp = int(time.time() * 1000)
-        message = f"Welcome to HodlHer! Please sign this message to verify your wallet ownership.\n\nAddress: {self.address.lower()}\nTimestamp: {timestamp}\nNetwork: INJEVM"
+        address_lower = self.address.lower()
+        message = f"Welcome to HodlHer! Please sign this message to verify your wallet ownership.\n\nAddress: {address_lower}\nTimestamp: {timestamp}\nNetwork: BSC"
         
         message_hash = encode_defunct(text=message)
         signed_message = self.account.sign_message(message_hash)
-        signature = "0x" + signed_message.signature.hex()
+        signature = signed_message.signature.hex()
+        
+        if not signature.startswith('0x'):
+            signature = '0x' + signature
         
         return {
-            "address": self.address.lower(),
+            "address": address_lower,
             "message": message,
             "signature": signature,
             "walletType": "metamask"
@@ -94,7 +98,14 @@ class HodlHerBot:
         try:
             payload = self.create_signature()
             url = f"{self.base_url}/api/auth/signature"
-            response = self.session.post(url, json=payload, timeout=30)
+            
+            login_headers = self.session.headers.copy()
+            login_headers.update({
+                'referer': 'https://dapp.hodlher.ai/login',
+                'priority': 'u=1, i'
+            })
+            
+            response = self.session.post(url, json=payload, headers=login_headers, timeout=30)
             
             if response.status_code == 200:
                 data = response.json()
@@ -122,7 +133,6 @@ class HodlHerBot:
             
             if response.status_code == 200:
                 data = response.json()
-                logger.log(f"Found {len(data.get('chats', []))} existing chats", "DEBUG")
                 return data.get('chats', [])
             else:
                 logger.log(f"Get chats failed: {response.text}", "ERROR")
@@ -178,8 +188,6 @@ class HodlHerBot:
                 'priority': 'u=1, i'
             })
             
-            logger.log(f"Sending message...", "DEBUG")
-            
             response = self.session.post(url, json=payload, stream=True, timeout=120)
             
             if response.status_code != 200:
@@ -193,7 +201,6 @@ class HodlHerBot:
                         continue
                     
                     if 'data: [DONE]' in line:
-                        logger.log("Received [DONE] marker", "DEBUG")
                         break
                     
                     if line.startswith('data: '):
@@ -205,11 +212,9 @@ class HodlHerBot:
                         except:
                             continue
             
-            logger.log(f"Response received ({len(full_response)} chars)", "DEBUG")
-            
             return {
                 "success": True,
-                "response": full_response[:100] + "..." if len(full_response) > 100 else full_response
+                "response": full_response
             }
             
         except requests.exceptions.Timeout:
@@ -232,17 +237,14 @@ class HodlHerBot:
             for chat in chats:
                 if chat.get('status'):
                     chat_to_use = chat
-                    logger.log("Found active chat!", "DEBUG")
                     break
             
             if not chat_to_use:
                 chat_to_use = chats[0]
-                logger.log("No active chat, using first available chat", "DEBUG")
             
             chat_id = chat_to_use['id']
             logger.log(f"Using existing chat: {chat_id[:8]}...", "SUCCESS")
             logger.log(f"Chat title: {chat_to_use.get('title', 'N/A')}", "INFO")
-            logger.log(f"Chat status: {'Active' if chat_to_use.get('status') else 'Inactive'}", "DEBUG")
             
             success_count = 0
             for i in range(num_messages):
@@ -257,8 +259,11 @@ class HodlHerBot:
                 else:
                     success_count += 1
                     logger.log(f"Message sent successfully!", "SUCCESS")
-                    if 'response' in send_result:
-                        logger.log(f"Bot reply: {send_result['response']}", "DEBUG")
+                    if 'response' in send_result and send_result['response']:
+                        bot_reply = send_result['response']
+                        if len(bot_reply) > 150:
+                            bot_reply = bot_reply[:150] + "..."
+                        logger.log(f"Bot reply: {bot_reply}", "INFO")
                 
                 if i < num_messages - 1:
                     delay = random.randint(5, 10)
@@ -457,9 +462,7 @@ def process_account(bot: HodlHerBot, logger: BotLogger):
         
         daily_data = bot.get_sola_daily()
         if daily_data:
-            sign_in_count = daily_data.get('signInCount', 0)
             today_ok = daily_data.get('today_ok', False)
-            logger.log(f"Check-in Streak: {sign_in_count} days", "INFO")
             logger.log(f"Today Status: {'✓ Checked in' if today_ok else '✗ Not checked in'}", "INFO")
         
         time.sleep(2)
