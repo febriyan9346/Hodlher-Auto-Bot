@@ -1,3 +1,3 @@
-http://username:password@ip:port
-http://ip:port
-socks5://username:password@ip:port
+http://user:pass@host:port
+http://host:port
+socks5://user:pass@host:port
